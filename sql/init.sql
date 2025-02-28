@@ -1,10 +1,10 @@
 -- Create database if it doesn't exist
-CREATE DATABASE IF NOT EXISTS `fcm_db`
+CREATE DATABASE IF NOT EXISTS `push_db`
     CHARACTER SET utf8mb4
     COLLATE utf8mb4_0900_ai_ci;
 
 -- Use the database
-USE `fcm_db`;
+USE `push_db`;
 
 -- Drop and create the fcm_tokens table
 DROP TABLE IF EXISTS `fcm_tokens`;

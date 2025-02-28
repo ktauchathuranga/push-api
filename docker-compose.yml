@@ -2,7 +2,7 @@ services:
   db:
     image: mysql:8.0
     environment:
-      MYSQL_DATABASE: fcm_db
+      MYSQL_DATABASE: push_db
       MYSQL_USER: user
       MYSQL_PASSWORD: password
       MYSQL_ROOT_PASSWORD: rootpassword
@@ -17,7 +17,7 @@ services:
       - ./service-account.json:/app/service-account.json
     environment:
       DB_HOST: db
-      DB_NAME: fcm_db
+      DB_NAME: push_db
       DB_USER: user
       DB_PASS: password
       JWT_SECRET: your_jwt_secret_here  # Replace with a secure secret
