@@ -14,7 +14,7 @@ services:
     build: ./api
     volumes:
       - ./api:/var/www/html
-      - ./service-account.json:/app/service-account.json
+      - ./service-account.json:/var/www/html/app/service-account.json
     environment:
       DB_HOST: db
       DB_NAME: push_db
