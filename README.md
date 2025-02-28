@@ -1,312 +1,350 @@
-# Push API
+# Push API Documentation
 
-**Push API** is a robust, RESTful API for managing Firebase Cloud Messaging (FCM) tokens and sending push notifications. Built with PHP and dockerized for seamless deployment, it offers user authentication via JWT (JSON Web Tokens), an open endpoint to save FCM tokens, and a secure endpoint to send notifications. This project is designed for scalability, security, and ease of use in production environments.
+## Overview
+A production-ready API for user authentication and push notification management using Firebase Cloud Messaging (FCM). Features JWT authentication, secure credential storage, and bulk notification delivery.
 
-## Features
+---
 
-- **User Authentication**:
-  - **Signup**: Register new users with a username and password.
-  - **Login**: Authenticate users and issue JWT tokens.
-- **FCM Token Management**:
-  - **Save FCM Token**: Store FCM tokens without authentication.
-- **Notification Sending**:
-  - Send customizable push notifications (title and body) to all stored FCM tokens using FCM v1 API.
-- **Security**:
-  - JWT-based authentication for sending notifications.
-  - Password hashing with PHP’s `password_hash`.
-  - Input validation and secure error handling.
-- **Deployment**:
-  - Dockerized with MySQL (database), PHP-FPM (API), and Nginx (web server).
-  - Configurable via environment variables.
+## Table of Contents
+- [Push API Documentation](#push-api-documentation)
+  - [Overview](#overview)
+  - [Table of Contents](#table-of-contents)
+  - [Authentication](#authentication)
+    - [JWT Bearer Tokens](#jwt-bearer-tokens)
+  - [Endpoints](#endpoints)
+    - [1. User Registration](#1-user-registration)
+    - [2. User Login](#2-user-login)
+    - [3. Store FCM Token](#3-store-fcm-token)
+    - [4. Send Notifications](#4-send-notifications)
+  - [Setup Guide](#setup-guide)
+    - [1. Server Requirements](#1-server-requirements)
+    - [2. Environment Configuration](#2-environment-configuration)
+    - [3. Database Schema](#3-database-schema)
+    - [4. Firebase Configuration](#4-firebase-configuration)
+  - [Testing](#testing)
+    - [1. Registration Test](#1-registration-test)
+    - [2. Load Testing](#2-load-testing)
+  - [Security](#security)
+    - [1. Encryption](#1-encryption)
+    - [2. Credential Handling](#2-credential-handling)
+    - [3. Input Validation](#3-input-validation)
+  - [Rate Limiting](#rate-limiting)
+  - [Monitoring](#monitoring)
+    - [Key Metrics](#key-metrics)
+    - [Alert Thresholds](#alert-thresholds)
+  - [Best Practices](#best-practices)
+    - [1. Client Implementation](#1-client-implementation)
+    - [2. Notification Design](#2-notification-design)
+  - [Troubleshooting](#troubleshooting)
+    - [Common Errors](#common-errors)
+    - [Log Analysis](#log-analysis)
 
-## Project Structure
+---
 
+## Authentication
+### JWT Bearer Tokens
+```http
+Authorization: Bearer <your_jwt_token>
 ```
-push-api/
-├── api/
-│   ├── index.php         # Main API script handling all endpoints
-│   ├── Dockerfile        # PHP-FPM Dockerfile
-│   └── logs/             # Directory for API logs
-├── sql/
-│   └── init.sql          # Database schema and initial data
-├── nginx.conf            # Nginx configuration
-├── docker-compose.yml    # Docker Compose configuration
-├── service-account.json  # Firebase service account file (not included)
-└── README.md             # This file
+
+1. Obtain token via `/login` endpoint
+2. Token expires in 1 hour (3600 seconds)
+3. Required for protected endpoints:
+   - `/send-notification`
+
+---
+
+## Endpoints
+
+### 1. User Registration
+```http
+POST / {action: "signup"}
 ```
 
-## Prerequisites
+**Request:**
+```json
+{
+  "action": "signup",
+  "username": "user@example.com",
+  "password": "SecurePass123!"
+}
+```
 
-- **Docker**: Version 20.10 or higher.
-- **Docker Compose**: Version 1.29 or higher.
-- **Firebase Service Account**: A `service-account.json` file from your Firebase project (Firebase Console > Project Settings > Service Accounts).
-- **Basic Knowledge**: Familiarity with REST APIs, JSON, and command-line interfaces.
+**Validation Rules:**
+- Username: 3-30 chars (`a-zA-Z0-9_-\.`)
+- Password: 8-72 chars
 
-## Setup Instructions
+**Responses:**
+| Status | Description                  |
+|--------|------------------------------|
+| 201    | User created successfully    |
+| 400    | Invalid input format         |
+| 409    | Username already exists      |
 
-### 1. Clone or Create the Project
-If using a repository:
+---
+
+### 2. User Login
+```http
+POST / {action: "login"}
+```
+
+**Request:**
+```json
+{
+  "action": "login",
+  "username": "user@example.com",
+  "password": "SecurePass123!"
+}
+```
+
+**Response:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Error Codes:**
+| Status | Description                  |
+|--------|------------------------------|
+| 401    | Invalid credentials          |
+| 429    | Too many failed attempts     |
+
+---
+
+### 3. Store FCM Token
+```http
+POST / {action: "store_token"}
+```
+
+**Request:**
+```json
+{
+  "action": "store_token",
+  "token": "fcm_token_from_device"
+}
+```
+
+**Validation:**
+- 152-character string format
+
+**Responses:**
+| Status | Description                  |
+|--------|------------------------------|
+| 200    | Token stored successfully    |
+| 409    | Token already exists         |
+
+---
+
+### 4. Send Notifications
+```http
+POST / {action: "send_notification"}
+```
+
+**Request:**
+```json
+{
+  "action": "send_notification",
+  "title": "Server Alert",
+  "body": "CPU usage at 95%"
+}
+```
+
+**Headers:**
+```http
+Authorization: Bearer <your_jwt_token>
+```
+
+**Response:**
+```json
+{
+  "message": "Notifications sent",
+  "success_count": 145,
+  "failure_count": 2
+}
+```
+
+**Error Codes:**
+| Status | Description                  |
+|--------|------------------------------|
+| 401    | Invalid/missing JWT          |
+| 403    | Insufficient permissions     |
+| 429    | Rate limit exceeded          |
+
+---
+
+## Setup Guide
+
+### 1. Server Requirements
+- PHP 8.1+ with extensions:
+  - openssl
+  - pdo_mysql
+  - curl
+- MySQL 8.0+
+- Firebase Project
+
+### 2. Environment Configuration
+`.env` file:
+```ini
+DB_HOST=mysql-host
+DB_NAME=push_db
+DB_USER=api_user
+DB_PASS=Str0ngP@ss!
+JWT_SECRET=your_256bit_secret_here
+```
+
+### 3. Database Schema
+```sql
+CREATE TABLE users (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(30) UNIQUE NOT NULL,
+  password_hash CHAR(60) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE fcm_tokens (
+  token VARCHAR(152) PRIMARY KEY,
+  user_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
+
+### 4. Firebase Configuration
+1. Download service account JSON from Firebase Console
+2. Save as `service-account.json` in project root
+3. Set permissions:
+   ```bash
+   chmod 640 service-account.json
+   ```
+
+---
+
+## Testing
+
+### 1. Registration Test
 ```bash
-git clone <repository-url> push-api
-cd push-api
-```
-Alternatively, manually create the folder structure and copy the files.
-
-### 2. Add Firebase Service Account
-- Place your `service-account.json` file in the project root (`push-api/`).
-- Ensure it corresponds to your Firebase project with FCM enabled.
-
-### 3. Configure Environment
-Edit `docker-compose.yml` to set a secure `JWT_SECRET`:
-```yaml
-environment:
-  JWT_SECRET: your_secure_jwt_secret_here  # Replace with a strong secret
+curl -X POST https://api.example.com/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "signup",
+    "username": "test@example.com",
+    "password": "TestPass123!"
+  }'
 ```
 
-### 4. Create Logs Directory
+### 2. Load Testing
 ```bash
-mkdir -p api/logs
-```
-
-### 5. Start the Application
-Launch the services with Docker Compose:
-```bash
-docker-compose up -d
-```
-- This starts MySQL, PHP-FPM, and Nginx in the background.
-- Allow a few seconds for MySQL to initialize the database.
-
-### 6. Verify Setup
-Confirm all services are running:
-```bash
-docker ps
-```
-Expect to see: `push-api_db_1`, `push-api_php_1`, and `push-api_nginx_1`.
-
-## API Endpoints
-
-### Base URL
-`http://localhost` (default port 80)
-
-### 1. POST `/signup`
-Register a new user.
-
-#### Request
-- **Method**: POST
-- **Content-Type**: `application/json`
-- **Body**:
-  ```json
-  {
-    "username": "your_username",
-    "password": "your_password"
-  }
-  ```
-  - `username`: String (unique, max 50 characters).
-  - `password`: String (minimum 6 characters).
-
-#### Response
-- **Success (200)**:
-  ```json
-  {"message": "User created successfully"}
-  ```
-- **Error (400)**: Invalid input.
-  ```json
-  {"error": "Invalid username or password (min 6 chars)"}
-  ```
-- **Error (409)**: Username already exists.
-  ```json
-  {"error": "Username already exists"}
-  ```
-- **Error (500)**: Server error.
-  ```json
-  {"error": "Internal server error"}
-  ```
-
-#### Example
-```bash
-curl -X POST http://localhost/signup \
-     -H "Content-Type: application/json" \
-     -d '{"username": "admin", "password": "securepass123"}'
+wrk -t4 -c100 -d30s \
+  -s post.lua \
+  http://api.example.com/
 ```
 
 ---
 
-### 2. POST `/login`
-Authenticate a user and obtain a JWT token.
+## Security
 
-#### Request
-- **Method**: POST
-- **Content-Type**: `application/json`
-- **Body**:
-  ```json
-  {
-    "username": "your_username",
-    "password": "your_password"
-  }
-  ```
+### 1. Encryption
+- HTTPS mandatory for all endpoints
+- TLS 1.3 required
+- HSTS header enforced
 
-#### Response
-- **Success (200)**:
-  ```json
-  {"token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."}
-  ```
-- **Error (400)**: Missing fields.
-  ```json
-  {"error": "Missing username or password"}
-  ```
-- **Error (401)**: Invalid credentials.
-  ```json
-  {"error": "Invalid credentials"}
-  ```
-- **Error (500)**: Server error.
-  ```json
-  {"error": "Internal server error"}
-  ```
+### 2. Credential Handling
+- Password hashing: bcrypt (cost 12)
+- JWT secret: 256-bit minimum
+- Key rotation:
+  - JWT secret: 90 days
+  - Database credentials: 180 days
 
-#### Example
-```bash
-curl -X POST http://localhost/login \
-     -H "Content-Type: application/json" \
-     -d '{"username": "admin", "password": "securepass123"}'
+### 3. Input Validation
+```php
+// Username validation
+if (!preg_match('/^[\w\-.]{3,30}$/', $username)) {
+  throw new InvalidInputException();
+}
+
+// Notification content
+if (strlen($title) > 255 || strlen($body) > 1024) {
+  throw new ContentTooLongException();
+}
 ```
 
 ---
 
-### 3. POST `/store-token`
-Store an FCM token (open endpoint, no authentication required).
-
-#### Request
-- **Method**: POST
-- **Content-Type**: `application/json`
-- **Body**:
-  ```json
-  {
-    "token": "your_fcm_token_here"
-  }
-  ```
-  - `token`: String (valid FCM token).
-
-#### Response
-- **Success (200)**:
-  ```json
-  {"message": "FCM token saved successfully"}
-  ```
-- **Error (400)**: Invalid input.
-  ```json
-  {"error": "Invalid or missing token"}
-  ```
-- **Error (409)**: Token already exists.
-  ```json
-  {"error": "Token already exists"}
-  ```
-- **Error (500)**: Server error.
-  ```json
-  {"error": "Internal server error"}
-  ```
-
-#### Example
-```bash
-curl -X POST http://localhost/store-token \
-     -H "Content-Type: application/json" \
-     -d '{"token": "your_fcm_token_here"}'
-```
+## Rate Limiting
+| Endpoint            | Limit          |
+|---------------------|----------------|
+| /login              | 10 req/min     |
+| /signup             | 5 req/min      |
+| /send_notification  | 100 req/hour   |
 
 ---
 
-### 4. POST `/send-notification`
-Send push notifications to all stored FCM tokens (requires JWT authentication).
+## Monitoring
 
-#### Request
-- **Method**: POST
-- **Headers**:
-  - `Authorization: Bearer <your_jwt_token>`
-  - `Content-Type: application/json`
-- **Body**:
-  ```json
-  {
-    "title": "Notification Title",
-    "body": "Notification Body"
-  }
-  ```
+### Key Metrics
+```prometheus
+# HELP api_requests_total Total API requests
+api_requests_total{endpoint="signup"} 142
 
-#### Response
-- **Success (200)**:
-  ```json
-  {
-    "message": "Notifications sent",
-    "success_count": 1,
-    "failure_count": 0
-  }
-  ```
-- **Error (400)**: Missing fields.
-  ```json
-  {"error": "Missing title or body"}
-  ```
-- **Error (401)**: Invalid or missing JWT.
-  ```json
-  {"error": "Unauthorized"}
-  ```
-- **Error (500)**: Server error.
-  ```json
-  {"error": "Internal server error"}
-  ```
+# HELP notification_success Successfully delivered notifications
+notification_success 2345
 
-#### Example
-```bash
-curl -X POST http://localhost/send-notification \
-     -H "Authorization: Bearer <your_jwt_token>" \
-     -H "Content-Type: application/json" \
-     -d '{"title": "Test", "body": "Hello World"}'
+# HELP auth_failures Authentication failures
+auth_failures 23
 ```
+
+### Alert Thresholds
+- Error rate > 5% for 5 minutes
+- Auth failures > 20/min
+- Notification success rate < 95%
 
 ---
 
-## Authentication Flow
+## Best Practices
 
-1. **Register**: Use `/signup` to create a user account.
-2. **Login**: Authenticate with `/login` to receive a JWT token.
-3. **Send Notifications**: Use the JWT in the `Authorization` header for `/send-notification`.
+### 1. Client Implementation
+```javascript
+// Store token securely
+async function storeFCMToken(token) {
+  try {
+    await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getJWT()}`
+      },
+      body: JSON.stringify({
+        action: 'store_token',
+        token: token
+      })
+    });
+  } catch (error) {
+    retryWithExponentialBackoff();
+  }
+}
+```
 
-The JWT expires after 1 hour. Re-authenticate with `/login` to get a new token if it expires.
+### 2. Notification Design
+- Prioritize critical alerts
+- Include deep links
+- Localize content
+- Add urgency indicators
+- Provide opt-out mechanism
 
-## Saving FCM Tokens
-- Use `/store-token` to store tokens from devices without authentication.
-- Tokens are stored in the `fcm_tokens` table with a unique constraint.
+---
 
 ## Troubleshooting
 
-- **Container Logs**:
-  ```bash
-  docker logs push-api_php_1
-  ```
-- **API Logs**: Check `api/logs/api.log` for detailed error messages.
-- **Database Issues**: Ensure MySQL is running (`docker ps`) and the schema loaded correctly.
-- **FCM Failures**: Verify `service-account.json` is valid and matches your Firebase project.
+### Common Errors
+| Code | Message                  | Resolution               |
+|------|--------------------------|--------------------------|
+| 401  | Invalid JWT              | Refresh authentication   |
+| 429  | Too many requests        | Implement backoff        |
+| 503  | Service unavailable      | Check Firebase status    |
 
-## Production Considerations
-
-- **HTTPS**: Deploy with an HTTPS-enabled reverse proxy (e.g., Nginx with SSL certificates).
-- **JWT Secret**: Store `JWT_SECRET` in a secure environment variable or secret manager (e.g., AWS Secrets Manager).
-- **Rate Limiting**: Apply rate limiting to `/store-token` to prevent abuse (e.g., via Nginx or an API gateway).
-- **Scaling**: Add more PHP-FPM containers behind a load balancer for high traffic.
-- **Monitoring**: Integrate logging with a centralized system (e.g., ELK Stack).
-- **Backup**: Regularly back up the MySQL `db_data` volume.
-
-## Stopping the Application
-
-To stop and remove containers:
-```bash
-docker-compose down
+### Log Analysis
+```log
+[2023-08-20T14:23:45+00:00] [ERROR] [500] Database connection failed
+[2023-08-20T14:24:01+00:00] [WARN] [429] Rate limit exceeded from 192.168.1.1
 ```
-To also remove the database volume:
-```bash
-docker-compose down -v
-```
-
-## Contributing
-
-Contributions are welcome! Fork the repository, submit issues, or create pull requests. Ensure changes maintain security, performance, and code quality standards.
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details (create one if needed).
