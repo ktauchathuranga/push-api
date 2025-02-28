@@ -1,350 +1,209 @@
-# Push API Documentation
+# Push API
 
-## Overview
-A production-ready API for user authentication and push notification management using Firebase Cloud Messaging (FCM). Features JWT authentication, secure credential storage, and bulk notification delivery.
+A secure and scalable PHP-based API for handling user authentication, FCM token management, and push notification delivery using Firebase Cloud Messaging.
 
----
+## Features
 
-## Table of Contents
-- [Push API Documentation](#push-api-documentation)
-  - [Overview](#overview)
-  - [Table of Contents](#table-of-contents)
-  - [Authentication](#authentication)
-    - [JWT Bearer Tokens](#jwt-bearer-tokens)
-  - [Endpoints](#endpoints)
-    - [1. User Registration](#1-user-registration)
-    - [2. User Login](#2-user-login)
-    - [3. Store FCM Token](#3-store-fcm-token)
-    - [4. Send Notifications](#4-send-notifications)
-  - [Setup Guide](#setup-guide)
-    - [1. Server Requirements](#1-server-requirements)
-    - [2. Environment Configuration](#2-environment-configuration)
-    - [3. Database Schema](#3-database-schema)
-    - [4. Firebase Configuration](#4-firebase-configuration)
-  - [Testing](#testing)
-    - [1. Registration Test](#1-registration-test)
-    - [2. Load Testing](#2-load-testing)
-  - [Security](#security)
-    - [1. Encryption](#1-encryption)
-    - [2. Credential Handling](#2-credential-handling)
-    - [3. Input Validation](#3-input-validation)
-  - [Rate Limiting](#rate-limiting)
-  - [Monitoring](#monitoring)
-    - [Key Metrics](#key-metrics)
-    - [Alert Thresholds](#alert-thresholds)
-  - [Best Practices](#best-practices)
-    - [1. Client Implementation](#1-client-implementation)
-    - [2. Notification Design](#2-notification-design)
-  - [Troubleshooting](#troubleshooting)
-    - [Common Errors](#common-errors)
-    - [Log Analysis](#log-analysis)
+- JWT-based user authentication
+- Secure password hashing with bcrypt
+- FCM token storage and management
+- Firebase Cloud Messaging integration
+- Dockerized environment (PHP-FPM, MySQL, Nginx)
+- Rate limiting and security headers
+- Input validation and error handling
+- Logging system
 
----
+## Prerequisites
 
-## Authentication
-### JWT Bearer Tokens
-```http
-Authorization: Bearer <your_jwt_token>
+- Docker 20.10+
+- Docker Compose 2.0+
+- Firebase Service Account JSON file
+- PHP 8.2+ (for local development)
+
+## Quick Start
+
+1. Clone the repository:
+```bash
+git clone https://github.com/ktauchathuranga/push-api.git
+cd push-api
 ```
 
-1. Obtain token via `/login` endpoint
-2. Token expires in 1 hour (3600 seconds)
-3. Required for protected endpoints:
-   - `/send-notification`
-
----
-
-## Endpoints
-
-### 1. User Registration
-```http
-POST / {action: "signup"}
+2. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env file with your credentials
 ```
 
-**Request:**
+3. Initialize the project:
+```bash
+docker-compose up --build
+```
+
+4. Access the API at `http://localhost`
+
+## API Documentation
+
+### Endpoints
+
+#### 1. User Registration
+**POST /**  
+Payload:
 ```json
 {
   "action": "signup",
-  "username": "user@example.com",
+  "username": "testuser",
   "password": "SecurePass123!"
 }
 ```
 
-**Validation Rules:**
-- Username: 3-30 chars (`a-zA-Z0-9_-\.`)
-- Password: 8-72 chars
-
-**Responses:**
-| Status | Description                  |
-|--------|------------------------------|
-| 201    | User created successfully    |
-| 400    | Invalid input format         |
-| 409    | Username already exists      |
-
----
-
-### 2. User Login
-```http
-POST / {action: "login"}
-```
-
-**Request:**
+#### 2. User Login
+**POST /**  
+Payload:
 ```json
 {
   "action": "login",
-  "username": "user@example.com",
+  "username": "testuser",
   "password": "SecurePass123!"
 }
 ```
 
-**Response:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-
-**Error Codes:**
-| Status | Description                  |
-|--------|------------------------------|
-| 401    | Invalid credentials          |
-| 429    | Too many failed attempts     |
-
----
-
-### 3. Store FCM Token
-```http
-POST / {action: "store_token"}
-```
-
-**Request:**
+#### 3. Store FCM Token
+**POST /**  
+Payload:
 ```json
 {
   "action": "store_token",
-  "token": "fcm_token_from_device"
+  "token": "your_fcm_token_here"
 }
 ```
 
-**Validation:**
-- 152-character string format
-
-**Responses:**
-| Status | Description                  |
-|--------|------------------------------|
-| 200    | Token stored successfully    |
-| 409    | Token already exists         |
-
----
-
-### 4. Send Notifications
-```http
-POST / {action: "send_notification"}
+#### 4. Send Notification
+**POST /**  
+Headers:
 ```
-
-**Request:**
+Authorization: Bearer <JWT_TOKEN>
+```
+Payload:
 ```json
 {
   "action": "send_notification",
-  "title": "Server Alert",
-  "body": "CPU usage at 95%"
+  "title": "Hello World",
+  "body": "This is a test notification"
 }
 ```
 
-**Headers:**
-```http
-Authorization: Bearer <your_jwt_token>
+## Configuration
+
+### Environment Variables
+- `DB_HOST`: MySQL database host
+- `DB_NAME`: Database name
+- `DB_USER`: Database user
+- `DB_PASS`: Database password
+- `JWT_SECRET`: Secret key for JWT encoding
+- `FCM_TIMEOUT`: Firebase connection timeout (seconds)
+
+### Security Settings
+- JWT expiration: 1 hour
+- Password requirements: 8-72 characters
+- Username validation regex: `/^[a-zA-Z0-9_\-.]{3,30}$/`
+- Security headers:
+  - X-Content-Type-Options
+  - X-Frame-Options
+  - Content-Security-Policy
+  - Referrer-Policy
+
+## Project Structure
+
+```
+push-api/
+├── api/
+│   ├── logs/               # Error logs
+│   ├── index.php           # Main application logic
+│   └── Dockerfile          # PHP-FPM container configuration
+├── sql/
+│   └── init.sql            # Database schema
+├── docker-compose.yml      # Service orchestration
+├── nginx.conf              # Nginx server configuration
+├── .env.example            # Environment template
+└── service-account.json    # Firebase credentials
 ```
 
-**Response:**
-```json
-{
-  "message": "Notifications sent",
-  "success_count": 145,
-  "failure_count": 2
-}
-```
+## Database Schema
 
-**Error Codes:**
-| Status | Description                  |
-|--------|------------------------------|
-| 401    | Invalid/missing JWT          |
-| 403    | Insufficient permissions     |
-| 429    | Rate limit exceeded          |
-
----
-
-## Setup Guide
-
-### 1. Server Requirements
-- PHP 8.1+ with extensions:
-  - openssl
-  - pdo_mysql
-  - curl
-- MySQL 8.0+
-- Firebase Project
-
-### 2. Environment Configuration
-`.env` file:
-```ini
-DB_HOST=mysql-host
-DB_NAME=push_db
-DB_USER=api_user
-DB_PASS=Str0ngP@ss!
-JWT_SECRET=your_256bit_secret_here
-```
-
-### 3. Database Schema
 ```sql
 CREATE TABLE users (
   id INT PRIMARY KEY AUTO_INCREMENT,
   username VARCHAR(30) UNIQUE NOT NULL,
-  password_hash CHAR(60) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE fcm_tokens (
-  token VARCHAR(152) PRIMARY KEY,
-  user_id INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  token VARCHAR(255) UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-### 4. Firebase Configuration
-1. Download service account JSON from Firebase Console
-2. Save as `service-account.json` in project root
-3. Set permissions:
-   ```bash
-   chmod 640 service-account.json
-   ```
+## Error Handling
 
----
+The API returns standardized JSON error responses with appropriate HTTP status codes:
 
-## Testing
-
-### 1. Registration Test
-```bash
-curl -X POST https://api.example.com/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "signup",
-    "username": "test@example.com",
-    "password": "TestPass123!"
-  }'
-```
-
-### 2. Load Testing
-```bash
-wrk -t4 -c100 -d30s \
-  -s post.lua \
-  http://api.example.com/
-```
-
----
-
-## Security
-
-### 1. Encryption
-- HTTPS mandatory for all endpoints
-- TLS 1.3 required
-- HSTS header enforced
-
-### 2. Credential Handling
-- Password hashing: bcrypt (cost 12)
-- JWT secret: 256-bit minimum
-- Key rotation:
-  - JWT secret: 90 days
-  - Database credentials: 180 days
-
-### 3. Input Validation
-```php
-// Username validation
-if (!preg_match('/^[\w\-.]{3,30}$/', $username)) {
-  throw new InvalidInputException();
-}
-
-// Notification content
-if (strlen($title) > 255 || strlen($body) > 1024) {
-  throw new ContentTooLongException();
+```json
+{
+  "error": "Error message",
+  "code": 400
 }
 ```
 
----
+Common error codes:
+- 400: Bad Request
+- 401: Unauthorized
+- 404: Not Found
+- 405: Method Not Allowed
+- 409: Conflict
+- 500: Internal Server Error
 
-## Rate Limiting
-| Endpoint            | Limit          |
-|---------------------|----------------|
-| /login              | 10 req/min     |
-| /signup             | 5 req/min      |
-| /send_notification  | 100 req/hour   |
+## Security Considerations
 
----
+- All database queries use prepared statements
+- Passwords stored using bcrypt algorithm
+- JWT signature verification with HMAC-SHA256
+- Input validation for all user-provided data
+- Rate limiting through Nginx configuration
+- Regular security header implementation
+- Environment variables for sensitive data
 
-## Monitoring
+## Deployment Notes
 
-### Key Metrics
-```prometheus
-# HELP api_requests_total Total API requests
-api_requests_total{endpoint="signup"} 142
+1. Replace `your_jwt_secret_here` with a strong secret key
+2. Add valid Firebase service account JSON file
+3. Configure Nginx for production:
+   - Enable HTTPS with Let's Encrypt
+   - Set appropriate rate limiting
+   - Configure proper file permissions
+4. Regular database backups
+5. Monitor API logs for suspicious activity
 
-# HELP notification_success Successfully delivered notifications
-notification_success 2345
+## Contributing
 
-# HELP auth_failures Authentication failures
-auth_failures 23
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/new-feature`
+3. Commit changes: `git commit -am 'Add new feature'`
+4. Push to branch: `git push origin feature/new-feature`
+5. Submit pull request
+
+## License
+
+MIT License - See [LICENSE](LICENSE) for details
 ```
 
-### Alert Thresholds
-- Error rate > 5% for 5 minutes
-- Auth failures > 20/min
-- Notification success rate < 95%
+## Dependencies
 
----
+- PHP 8.2+
+- MySQL 8.0+
+- Nginx
+- Firebase Admin SDK
+- OpenSSL
 
-## Best Practices
-
-### 1. Client Implementation
-```javascript
-// Store token securely
-async function storeFCMToken(token) {
-  try {
-    await fetch(API_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getJWT()}`
-      },
-      body: JSON.stringify({
-        action: 'store_token',
-        token: token
-      })
-    });
-  } catch (error) {
-    retryWithExponentialBackoff();
-  }
-}
-```
-
-### 2. Notification Design
-- Prioritize critical alerts
-- Include deep links
-- Localize content
-- Add urgency indicators
-- Provide opt-out mechanism
-
----
-
-## Troubleshooting
-
-### Common Errors
-| Code | Message                  | Resolution               |
-|------|--------------------------|--------------------------|
-| 401  | Invalid JWT              | Refresh authentication   |
-| 429  | Too many requests        | Implement backoff        |
-| 503  | Service unavailable      | Check Firebase status    |
-
-### Log Analysis
-```log
-[2023-08-20T14:23:45+00:00] [ERROR] [500] Database connection failed
-[2023-08-20T14:24:01+00:00] [WARN] [429] Rate limit exceeded from 192.168.1.1
 ```
