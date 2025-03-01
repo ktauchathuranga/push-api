@@ -26,7 +26,7 @@ jobs:
 
       # Build and tag the Docker image using the public_web folder as the context
       - name: Build Docker image
-        run: docker build -t ghcr.io/${{ github.repository_owner }}/push-api:latest .
+        run: docker build -t ghcr.io/${{ github.repository_owner }}/push-api:latest ./api
 
       # Push the Docker image to GitHub Container Registry
       - name: Push Docker image
