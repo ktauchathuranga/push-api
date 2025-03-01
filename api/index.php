@@ -225,6 +225,15 @@ final class FirebaseService {
 // Main Application
 // ==============================
 try {
+    // Handle CORS preflight requests first
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(200);
+        header("Access-Control-Allow-Origin: *");
+        header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
+        exit();
+    }
+
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         throw new RuntimeException('Method Not Allowed', 405);
     }
