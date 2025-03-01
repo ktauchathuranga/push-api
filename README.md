@@ -196,7 +196,6 @@ Common error codes:
 ## License
 
 MIT License - See [LICENSE](LICENSE) for details
-```
 
 ## Dependencies
 
@@ -205,5 +204,3 @@ MIT License - See [LICENSE](LICENSE) for details
 - Nginx
 - Firebase Admin SDK
 - OpenSSL
-
-```
