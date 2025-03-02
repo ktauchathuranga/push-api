@@ -1,16 +1,30 @@
 <?php
 declare(strict_types=1);
 
+// Handle preflight OPTIONS requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header("Access-Control-Allow-Origin: *");
+    header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization");
+    http_response_code(200);
+    exit();
+}
+
+// For actual requests, allow all origins
+header("Access-Control-Allow-Origin: *");
+
+// Existing headers
+header('Content-Type: application/json');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+
 // ==============================
 // Environment Configuration
 // ==============================
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 ini_set('error_log', __DIR__ . '/logs/api.log');
-header('Content-Type: application/json');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header('Referrer-Policy: strict-origin-when-cross-origin');
 
 // ==============================
 // Security Constants
@@ -110,10 +124,10 @@ final class Validator {
 // Firebase Service
 // ==============================
 final class FirebaseService {
-    public static function sendNotifications(string $title, string $body, array $tokens): array {
+    public static function sendNotifications(string $title, string $body, string $url, array $tokens): array {
         $serviceAccount = self::getServiceAccount();
         $accessToken = self::getAccessToken($serviceAccount);
-        return self::sendToFcm($title, $body, $tokens, $serviceAccount['project_id'], $accessToken);
+        return self::sendToFcm($title, $body, $url, $tokens, $serviceAccount['project_id'], $accessToken);
     }
 
     private static function getServiceAccount(): array {
@@ -183,24 +197,39 @@ final class FirebaseService {
         );
     }
 
-    private static function sendToFcm(string $title, string $body, array $tokens, string $projectId, string $accessToken): array {
+    private static function sendToFcm(string $title, string $body, string $clickUrl, array $tokens, string $projectId, string $accessToken): array {
         $success = 0;
-        $url = "https://fcm.googleapis.com/v1/projects/$projectId/messages:send";
+        $fcmUrl = "https://fcm.googleapis.com/v1/projects/$projectId/messages:send";
         $headers = [
             'Authorization: Bearer ' . $accessToken,
             'Content-Type: application/json',
             'Accept: application/json'
         ];
-
+        
         foreach ($tokens as $token) {
             $payload = [
                 'message' => [
                     'token' => $token,
-                    'notification' => ['title' => $title, 'body' => $body]
+                    'webpush' => [
+                        'notification' => [
+                            'title' => $title,
+                            'body'  => $body,
+                            'icon'  => '/images/pwa/icons/android/android-launchericon-512-512.png',
+                            'badge' => '/images/pwa/icons/android/android-launchericon-512-512.png'
+                        ],
+                        // Pass the URL so your service worker can access it.
+                        'data' => [
+                            'click_action' => $clickUrl
+                        ],
+                        // This is the proper place for the URL click action.
+                        'fcm_options' => [
+                            'link' => $clickUrl
+                        ]
+                    ]
                 ]
             ];
-
-            $ch = curl_init($url);
+        
+            $ch = curl_init($fcmUrl);
             curl_setopt_array($ch, [
                 CURLOPT_POST => true,
                 CURLOPT_HTTPHEADER => $headers,
@@ -208,17 +237,21 @@ final class FirebaseService {
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT => FCM_TIMEOUT
             ]);
-
+        
             $response = curl_exec($ch);
             $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-
-            if ($status === 200) $success++;
-            else error_log("FCM error: $status - $response");
+        
+            if ($status === 200) {
+                $success++;
+            } else {
+                error_log("FCM error: $status - $response");
+            }
         }
-
+        
         return ['success' => $success, 'failure' => count($tokens) - $success];
     }
+    
 }
 
 // ==============================
@@ -301,15 +334,19 @@ try {
             if (!JWT::decode($matches[1], getenv('JWT_SECRET'))) {
                 throw new RuntimeException('Invalid token', 401);
             }
-
+        
             $title = trim($input['title'] ?? '');
             $body = trim($input['body'] ?? '');
+            $url = trim($input['url'] ?? '');
+            if (empty($url)) {
+                throw new InvalidArgumentException('URL is required', 400);
+            }
             Validator::notificationContent($title, $body);
-
+        
             $tokens = $pdo->query('SELECT token FROM fcm_tokens')->fetchAll(PDO::FETCH_COLUMN);
             if (empty($tokens)) throw new RuntimeException('No tokens available', 404);
-
-            $result = FirebaseService::sendNotifications($title, $body, $tokens);
+        
+            $result = FirebaseService::sendNotifications($title, $body, $url, $tokens);
             echo json_encode([
                 'message' => 'Notifications sent',
                 'success_count' => $result['success'],
