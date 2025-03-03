@@ -88,7 +88,10 @@ Payload:
 {
   "action": "send_notification",
   "title": "Hello World",
-  "body": "This is a test notification"
+  "body": "This is a test notification",
+  "url" : "https://alquran.cc",
+  "icon" : "url-for-your-icon",
+  "badge" : "url-for-your-badge"
 }
 ```
 
