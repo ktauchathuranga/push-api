@@ -124,10 +124,17 @@ final class Validator {
 // Firebase Service
 // ==============================
 final class FirebaseService {
-    public static function sendNotifications(string $title, string $body, string $url, array $tokens): array {
+    public static function sendNotifications(
+        string $title,
+        string $body,
+        string $url,
+        array $tokens,
+        string $icon,
+        string $badge
+    ): array {
         $serviceAccount = self::getServiceAccount();
         $accessToken = self::getAccessToken($serviceAccount);
-        return self::sendToFcm($title, $body, $url, $tokens, $serviceAccount['project_id'], $accessToken);
+        return self::sendToFcm($title, $body, $url, $tokens, $icon, $badge, $serviceAccount['project_id'], $accessToken);
     }
 
     private static function getServiceAccount(): array {
@@ -197,7 +204,16 @@ final class FirebaseService {
         );
     }
 
-    private static function sendToFcm(string $title, string $body, string $clickUrl, array $tokens, string $projectId, string $accessToken): array {
+    private static function sendToFcm(
+        string $title,
+        string $body,
+        string $clickUrl,
+        array $tokens,
+        string $icon,
+        string $badge,
+        string $projectId,
+        string $accessToken
+    ): array {
         $success = 0;
         $fcmUrl = "https://fcm.googleapis.com/v1/projects/$projectId/messages:send";
         $headers = [
@@ -214,14 +230,12 @@ final class FirebaseService {
                         'notification' => [
                             'title' => $title,
                             'body'  => $body,
-                            'icon'  => '/images/pwa/icons/android/android-launchericon-512-512.png',
-                            'badge' => '/images/pwa/icons/android/android-launchericon-512-512.png'
+                            'icon'  => $icon,
+                            'badge' => $badge
                         ],
-                        // Pass the URL so your service worker can access it.
                         'data' => [
                             'click_action' => $clickUrl
                         ],
-                        // This is the proper place for the URL click action.
                         'fcm_options' => [
                             'link' => $clickUrl
                         ]
@@ -338,15 +352,20 @@ try {
             $title = trim($input['title'] ?? '');
             $body = trim($input['body'] ?? '');
             $url = trim($input['url'] ?? '');
+            // Optional: use user-provided icon and badge, or default if not provided
+            $icon = trim($input['icon'] ?? '');
+            $badge = trim($input['badge'] ?? '');
+            
             if (empty($url)) {
                 throw new InvalidArgumentException('URL is required', 400);
             }
             Validator::notificationContent($title, $body);
-        
+            
             $tokens = $pdo->query('SELECT token FROM fcm_tokens')->fetchAll(PDO::FETCH_COLUMN);
             if (empty($tokens)) throw new RuntimeException('No tokens available', 404);
-        
-            $result = FirebaseService::sendNotifications($title, $body, $url, $tokens);
+            
+            // Pass the optional icon and badge values along with the other parameters
+            $result = FirebaseService::sendNotifications($title, $body, $url, $tokens, $icon, $badge);
             echo json_encode([
                 'message' => 'Notifications sent',
                 'success_count' => $result['success'],
